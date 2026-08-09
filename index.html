@@ -360,7 +360,7 @@ a{
   bottom:0;
   width:min(760px,100%);
   display:grid;
-  grid-template-columns:repeat(4,1fr);
+  grid-template-columns:repeat(5,1fr);
   background:rgba(255,255,255,.94);
   backdrop-filter:blur(16px);
   border-top:1px solid var(--line);
@@ -386,6 +386,46 @@ a{
 .navbtn.active{
   color:var(--pink);
   background:#fff3f7;
+}
+
+.clothing{
+  background:#fff;
+  border:1px solid var(--line);
+  border-radius:20px;
+  padding:14px;
+  margin:10px 0;
+}
+
+.clothing.bought{opacity:.76}
+
+.clothing-top{
+  display:flex;
+  justify-content:space-between;
+  gap:12px;
+}
+
+.clothing-title{
+  font-weight:900;
+  font-size:17px;
+}
+
+.clothing-image{
+  width:100%;
+  max-height:280px;
+  object-fit:cover;
+  border-radius:15px;
+  margin:10px 0;
+  border:1px solid var(--line);
+}
+
+.price{
+  font-weight:900;
+  color:#5d5361;
+}
+
+.badge.bought{
+  background:#ecfbf4;
+  color:#218f64;
 }
 
 .empty{
@@ -529,6 +569,40 @@ a{
 
 </section>
 
+<section class="page" id="page-clothes">
+
+  <h1 class="section-title">服候補 👗</h1>
+  <p class="section-sub">欲しい服・着てほしい服・おそろい候補を共有。</p>
+
+  <div class="card">
+    <h2>＋ 服を追加</h2>
+
+    <div class="row">
+      <input id="clothesName" class="full" placeholder="商品名">
+      <input id="clothesBrand" placeholder="ブランド">
+
+      <select id="clothesFor">
+        <option value="あかり">あかり用</option>
+        <option value="タクミ">タクミ用</option>
+        <option value="おそろい">おそろい</option>
+      </select>
+
+      <input id="clothesPrice" inputmode="numeric" placeholder="値段（例：7980）">
+      <input id="clothesSize" placeholder="サイズ（例：M / 24.0cm）">
+      <input id="clothesUrl" class="full" placeholder="商品URL">
+      <input id="clothesImage" class="full" placeholder="画像URL（なくてもOK）">
+
+      <textarea id="clothesMemo" class="full" placeholder="メモ：色、合わせたい靴、欲しい理由など"></textarea>
+
+      <button class="primary full" id="addClothesBtn">服候補に追加</button>
+    </div>
+  </div>
+
+  <div class="filters" id="clothesFilters"></div>
+  <div id="clothesList"></div>
+
+</section>
+
 <section class="page" id="page-done">
 
   <h1 class="section-title">行ったとこ 📷</h1>
@@ -573,6 +647,11 @@ a{
   行きたい
 </button>
 
+<button class="navbtn" data-tab="clothes">
+  <span>👗</span>
+  服
+</button>
+
 <button class="navbtn" data-tab="done">
   <span>▣</span>
   行った
@@ -596,12 +675,16 @@ let state = {
   nextDate:null,
   freeMemo:'',
   places:[],
+  clothes:[],
   heroPhoto:''
 };
 
 let currentFilter = '全部';
+let currentClothesFilter = '全部';
 let syncTimer = null;
 let memoTimer = null;
+
+const clothesFilterItems = ['全部','あかり','タクミ','おそろい','お気に入り','未購入','購入済み'];
 
 const filterItems = [
   '全部',
@@ -671,6 +754,22 @@ function normalize(){
         };
 
       })
+    : [];
+
+  state.clothes = Array.isArray(state.clothes)
+    ? state.clothes.map(c => ({
+        id:c.id || Date.now() + Math.random(),
+        name:c.name || '服候補',
+        brand:c.brand || '',
+        forWho:c.forWho || 'あかり',
+        price:c.price || '',
+        size:c.size || '',
+        url:c.url || '',
+        image:c.image || '',
+        memo:c.memo || '',
+        liked:!!c.liked,
+        bought:!!c.bought
+      }))
     : [];
 }
 
@@ -1350,6 +1449,146 @@ function renderLists(){
   wire();
 }
 
+function safeUrl(s=''){
+  const v=String(s).trim();
+  if(!v)return '';
+  try{
+    const u=new URL(v);
+    return (u.protocol==='http:'||u.protocol==='https:')?u.href:'';
+  }catch(e){
+    return '';
+  }
+}
+
+async function addClothes(){
+  const name=document.getElementById('clothesName').value.trim();
+  if(!name)return alert('商品名を入れて！');
+
+  state.clothes.unshift({
+    id:Date.now(),
+    name,
+    brand:document.getElementById('clothesBrand').value.trim(),
+    forWho:document.getElementById('clothesFor').value,
+    price:document.getElementById('clothesPrice').value.trim(),
+    size:document.getElementById('clothesSize').value.trim(),
+    url:document.getElementById('clothesUrl').value.trim(),
+    image:document.getElementById('clothesImage').value.trim(),
+    memo:document.getElementById('clothesMemo').value.trim(),
+    liked:false,
+    bought:false
+  });
+
+  ['clothesName','clothesBrand','clothesPrice','clothesSize','clothesUrl','clothesImage','clothesMemo']
+    .forEach(id=>document.getElementById(id).value='');
+
+  renderClothes();
+  await saveRemote();
+}
+
+function clothingMatches(c){
+  if(currentClothesFilter==='全部')return true;
+  if(currentClothesFilter==='お気に入り')return c.liked;
+  if(currentClothesFilter==='未購入')return !c.bought;
+  if(currentClothesFilter==='購入済み')return c.bought;
+  return c.forWho===currentClothesFilter;
+}
+
+function formatPrice(v){
+  const raw=String(v||'').trim();
+  const n=Number(raw.replace(/[^\d]/g,''));
+  return n ? '¥'+n.toLocaleString('ja-JP') : (raw ? esc(raw) : '価格未設定');
+}
+
+function clothingCard(c){
+  const url=safeUrl(c.url);
+  const image=safeUrl(c.image);
+
+  return `
+    <article class="clothing ${c.bought?'bought':''}">
+      <div class="clothing-top">
+        <div>
+          <div class="clothing-title">${esc(c.name)}</div>
+          <div class="meta">${esc(c.brand||'ブランド未設定')} ・ ${esc(c.forWho||'あかり')}用</div>
+        </div>
+        <div style="font-size:22px">${c.liked?'❤️':''}</div>
+      </div>
+
+      ${image?`<img class="clothing-image" src="${esc(image)}" alt="${esc(c.name)}" loading="lazy">`:''}
+
+      <div class="badges">
+        <span class="badge">${esc(c.forWho||'あかり')}</span>
+        ${c.size?`<span class="badge">サイズ ${esc(c.size)}</span>`:''}
+        ${c.liked?'<span class="badge like">お気に入り ❤️</span>':''}
+        ${c.bought?'<span class="badge bought">購入済み ✓</span>':''}
+      </div>
+
+      <div class="price">${formatPrice(c.price)}</div>
+      ${c.memo?`<div class="memoText">${esc(c.memo)}</div>`:''}
+      ${url?`<a href="${esc(url)}" target="_blank" rel="noopener">商品ページを開く ↗</a>`:''}
+
+      <div class="actions">
+        <button class="secondary" data-clothes-like="${c.id}">${c.liked?'❤️解除':'❤️お気に入り'}</button>
+        <button class="ghost" data-clothes-bought="${c.id}">${c.bought?'未購入に戻す':'✓ 買った'}</button>
+        <button class="danger full" data-clothes-del="${c.id}">削除</button>
+      </div>
+    </article>
+  `;
+}
+
+async function toggleClothesLike(id){
+  const c=state.clothes.find(x=>x.id===id);
+  if(!c)return;
+  c.liked=!c.liked;
+  renderClothes();
+  await saveRemote();
+}
+
+async function toggleClothesBought(id){
+  const c=state.clothes.find(x=>x.id===id);
+  if(!c)return;
+  c.bought=!c.bought;
+  renderClothes();
+  await saveRemote();
+}
+
+async function removeClothes(id){
+  if(!confirm('この服候補を削除する？'))return;
+  state.clothes=state.clothes.filter(x=>x.id!==id);
+  renderClothes();
+  await saveRemote();
+}
+
+function renderClothes(){
+  document.getElementById('clothesFilters').innerHTML=clothesFilterItems.map(
+    f=>`<button class="chip ${f===currentClothesFilter?'active':''}" data-clothes-filter="${esc(f)}">${esc(f)}</button>`
+  ).join('');
+
+  document.querySelectorAll('[data-clothes-filter]').forEach(
+    b=>b.onclick=()=>{
+      currentClothesFilter=b.dataset.clothesFilter;
+      renderClothes();
+    }
+  );
+
+  const items=state.clothes.filter(clothingMatches);
+
+  document.getElementById('clothesList').innerHTML=
+    items.length?items.map(clothingCard).join(''):
+    '<div class="empty">まだ服候補なし。<br>気になる服を追加しよう 👗</div>';
+
+  document.querySelectorAll('[data-clothes-like]').forEach(
+    b=>b.onclick=()=>toggleClothesLike(Number(b.dataset.clothesLike))
+  );
+
+  document.querySelectorAll('[data-clothes-bought]').forEach(
+    b=>b.onclick=()=>toggleClothesBought(Number(b.dataset.clothesBought))
+  );
+
+  document.querySelectorAll('[data-clothes-del]').forEach(
+    b=>b.onclick=()=>removeClothes(Number(b.dataset.clothesDel))
+  );
+}
+
 function renderStats(){
 
   document.getElementById('countAll')
@@ -1383,6 +1622,7 @@ function renderAll(){
   renderPhoto();
   renderStats();
   renderLists();
+  renderClothes();
 }
 
 function setupMemo(){
@@ -1467,6 +1707,9 @@ document.getElementById('saveDateBtn').onclick =
 document.getElementById('addPlaceBtn').onclick =
   addPlace;
 
+document.getElementById('addClothesBtn').onclick =
+  addClothes;
+
 setupPhoto();
 setupMemo();
 normalize();
@@ -1504,4 +1747,3 @@ if ('serviceWorker' in navigator) {
 </script>
 
 </body>
-</html>
