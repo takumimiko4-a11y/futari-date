@@ -1452,13 +1452,72 @@ function renderLists(){
 
 function safeUrl(s=''){
   const v=String(s).trim();
+
   if(!v)return '';
+
   try{
     const u=new URL(v);
     return (u.protocol==='http:'||u.protocol==='https:')?u.href:'';
   }catch(e){
     return '';
   }
+}
+
+function safeImageSrc(s=''){
+  const v=String(s).trim();
+
+  if(!v)return '';
+
+  if(/^data:image\//i.test(v)){
+    return v;
+  }
+
+  return safeUrl(v);
+}
+
+function fileToDataUrl(file){
+  return new Promise((resolve,reject)=>{
+
+    const reader=new FileReader();
+    const img=new Image();
+
+    reader.onload=()=>{
+
+      img.onload=()=>{
+
+        const max=1100;
+        const scale=Math.min(1,max/img.width);
+
+        const canvas=document.createElement('canvas');
+
+        canvas.width=Math.round(img.width*scale);
+        canvas.height=Math.round(img.height*scale);
+
+        canvas
+          .getContext('2d')
+          .drawImage(
+            img,
+            0,
+            0,
+            canvas.width,
+            canvas.height
+          );
+
+        resolve(
+          canvas.toDataURL(
+            'image/jpeg',
+            0.78
+          )
+        );
+      };
+
+      img.onerror=reject;
+      img.src=reader.result;
+    };
+
+    reader.onerror=reject;
+    reader.readAsDataURL(file);
+  });
 }
 
 async function addClothes(){
