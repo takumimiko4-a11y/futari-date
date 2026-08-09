@@ -1,0 +1,18 @@
+{
+  "name": "タクミとあかりの行きたいとこ",
+  "short_name": "タクミとあかり",
+  "start_url": "./",
+  "scope": "./",
+  "display": "standalone",
+  "background_color": "#fff7fb",
+  "theme_color": "#ff648e",
+  "description": "タクミとあかりのデート共有アプリ",
+  "icons": [
+    {
+      "src": "./icon.svg",
+      "sizes": "any",
+      "type": "image/svg+xml",
+      "purpose": "any maskable"
+    }
+  ]
+}
