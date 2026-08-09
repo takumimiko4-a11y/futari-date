@@ -590,8 +590,9 @@ a{
       <input id="clothesPrice" inputmode="numeric" placeholder="値段（例：7980）">
       <input id="clothesSize" placeholder="サイズ（例：M / 24.0cm）">
       <input id="clothesUrl" class="full" placeholder="商品URL">
-      <input id="clothesImage" class="full" placeholder="画像URL（なくてもOK）">
+      <input id="clothesImage" class="full" type="file" accept="image/*">
 
+      <div class="full save-state" style="text-align:left">商品画像のスクショをそのまま選べるよ</div>
       <textarea id="clothesMemo" class="full" placeholder="メモ：色、合わせたい靴、欲しい理由など"></textarea>
 
       <button class="primary full" id="addClothesBtn">服候補に追加</button>
@@ -1462,7 +1463,20 @@ function safeUrl(s=''){
 
 async function addClothes(){
   const name=document.getElementById('clothesName').value.trim();
+
   if(!name)return alert('商品名を入れて！');
+
+  const fileInput=document.getElementById('clothesImage');
+  let image='';
+
+  if(fileInput.files && fileInput.files[0]){
+    try{
+      image=await fileToDataUrl(fileInput.files[0]);
+    }catch(e){
+      alert('画像の読み込みに失敗したよ');
+      return;
+    }
+  }
 
   state.clothes.unshift({
     id:Date.now(),
@@ -1472,14 +1486,15 @@ async function addClothes(){
     price:document.getElementById('clothesPrice').value.trim(),
     size:document.getElementById('clothesSize').value.trim(),
     url:document.getElementById('clothesUrl').value.trim(),
-    image:document.getElementById('clothesImage').value.trim(),
+    image,
     memo:document.getElementById('clothesMemo').value.trim(),
     liked:false,
     bought:false
   });
 
-  ['clothesName','clothesBrand','clothesPrice','clothesSize','clothesUrl','clothesImage','clothesMemo']
+  ['clothesName','clothesBrand','clothesPrice','clothesSize','clothesUrl','clothesMemo']
     .forEach(id=>document.getElementById(id).value='');
+  fileInput.value='';
 
   renderClothes();
   await saveRemote();
@@ -1501,7 +1516,7 @@ function formatPrice(v){
 
 function clothingCard(c){
   const url=safeUrl(c.url);
-  const image=safeUrl(c.image);
+  const image=safeImageSrc(c.image);
 
   return `
     <article class="clothing ${c.bought?'bought':''}">
@@ -1747,3 +1762,4 @@ if ('serviceWorker' in navigator) {
 </script>
 
 </body>
+</html>
